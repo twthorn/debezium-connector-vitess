@@ -474,4 +474,66 @@ public class VStreamOutputMessageDecoderTest {
         assertThat(processed[0]).isTrue();
     }
 
+    @Test
+    public void shouldSetRowEventsToCommitTimestamp() throws Exception {
+        // setup fixture
+        Long expectedBeginTimestamp = 1L;
+        Long expectedCommitTimestamp = 2L;
+        Binlogdata.VEvent beginEvent = Binlogdata.VEvent.newBuilder()
+                .setType(Binlogdata.VEventType.BEGIN)
+                .setTimestamp(expectedBeginTimestamp)
+                .build();
+        Binlogdata.VEvent commitEvent = Binlogdata.VEvent.newBuilder()
+                .setType(Binlogdata.VEventType.COMMIT)
+                .setTimestamp(expectedCommitTimestamp)
+                .build();
+        decoder.processMessage(TestHelper.defaultFieldEvent(), null, null, false);
+        schema.tableFor(TestHelper.defaultTableId());
+        schema.tableFor(TestHelper.defaultTableId());
+        Vgtid newVgtid = Vgtid.of(VgtidTest.VGTID_JSON);
+
+        // exercise SUT
+//        final boolean[] processed = { false };
+        decoder.processMessage(
+                beginEvent,
+                (message, vgtid, isLastRowEventOfTransaction) -> {
+                    // verify outcome
+                    assertThat(message.getCommitTime().getEpochSecond()).isEqualTo(expectedBeginTimestamp);
+                },
+                newVgtid,
+                false);
+        decoder.processMessage(
+                TestHelper.defaultInsertEvent(),
+                (message, vgtid, isLastRowEventOfTransaction) -> {
+                    // verify outcome
+                    assertThat(message.getCommitTime().getEpochSecond()).isEqualTo(expectedCommitTimestamp);
+                },
+                null,
+                false);
+        decoder.processMessage(
+                TestHelper.defaultUpdateEvent(),
+                (message, vgtid, isLastRowEventOfTransaction) -> {
+                    // verify outcome
+                    assertThat(message.getCommitTime().getEpochSecond()).isEqualTo(expectedCommitTimestamp);
+                },
+                null,
+                false);
+        decoder.processMessage(
+                TestHelper.defaultDeleteEvent(),
+                (message, vgtid, isLastRowEventOfTransaction) -> {
+                    // verify outcome
+                    assertThat(message.getCommitTime().getEpochSecond()).isEqualTo(expectedCommitTimestamp);
+                },
+                null,
+                false);
+        decoder.processMessage(
+                commitEvent,
+                (message, vgtid, isLastRowEventOfTransaction) -> {
+                    // verify outcome
+                    assertThat(message.getCommitTime().getEpochSecond()).isEqualTo(expectedCommitTimestamp);
+                },
+                newVgtid,
+                false);
+    }
+
 }
