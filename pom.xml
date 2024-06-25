@@ -166,9 +166,9 @@
             <artifactId>debezium-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.openjdk.jol</groupId>
-            <artifactId>jol-core</artifactId>
-            <version>0.17</version>
+            <groupId>com.carrotsearch</groupId>
+            <artifactId>java-sizeof</artifactId>
+            <version>0.0.5</version>
         </dependency>
         <!-- Vitess gRPC -->
         <dependency>
