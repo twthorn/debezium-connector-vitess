@@ -8,6 +8,7 @@ package io.debezium.connector.vitess;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.openjdk.jol.info.ClassLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -121,6 +122,9 @@ public class VitessStreamingChangeEventSource implements StreamingChangeEventSou
                     // Right before processing the last row, reset the previous offset to the new vgtid so the last row has the new vgtid as offset.
                     offsetContext.resetVgtid(newVgtid, message.getCommitTime());
                 }
+                if (isRecordOver1MB(message)) {
+                    LOGGER.warn("Record is over 1MB, record: {}", message);
+                }
                 dispatcher.dispatchDataChangeEvent(
                         partition,
                         tableId,
@@ -129,4 +133,10 @@ public class VitessStreamingChangeEventSource implements StreamingChangeEventSou
             }
         };
     }
+
+    public boolean isRecordOver1MB(Object record) {
+        long size = ClassLayout.parseInstance(record).instanceSize();
+        return size > 1024 * 1024;
+    }
+
 }

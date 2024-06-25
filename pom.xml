@@ -165,6 +165,11 @@
             <groupId>io.debezium</groupId>
             <artifactId>debezium-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.openjdk.jol</groupId>
+            <artifactId>jol-core</artifactId>
+            <version>0.17</version>
+        </dependency>
         <!-- Vitess gRPC -->
         <dependency>
             <groupId>io.vitess</groupId>

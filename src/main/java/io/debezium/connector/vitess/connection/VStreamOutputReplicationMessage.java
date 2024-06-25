@@ -5,6 +5,7 @@
  */
 package io.debezium.connector.vitess.connection;
 
+import java.io.Serializable;
 import java.time.Instant;
 import java.util.List;
 
