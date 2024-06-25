@@ -122,7 +122,7 @@ public class VitessStreamingChangeEventSource implements StreamingChangeEventSou
                     // Right before processing the last row, reset the previous offset to the new vgtid so the last row has the new vgtid as offset.
                     offsetContext.resetVgtid(newVgtid, message.getCommitTime());
                 }
-                if (isMessageForByfile(message) && getSizeBytes(message) > 10 * 1000) {
+                if (isMessageForByfile(message) && getSizeBytes(message) > 100 * 1000) {
                     LOGGER.warn("Big message is for byfile, bytes: {}, message: {}", getSizeBytes(message), message);
                 }
                 dispatcher.dispatchDataChangeEvent(
