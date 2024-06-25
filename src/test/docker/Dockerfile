@@ -11,6 +11,7 @@ RUN apt-get install -y sudo curl vim jq
 
 # Install etcd
 COPY install_local_dependencies.sh /vt/dist/install_local_dependencies.sh
+COPY local/grpc_static_auth.json /vt/dist/grpc_static_auth.json
 RUN /vt/dist/install_local_dependencies.sh
 
 # Copy binaries used by vitess components start-up scripts

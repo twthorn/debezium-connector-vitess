@@ -122,8 +122,11 @@ public class VitessStreamingChangeEventSource implements StreamingChangeEventSou
                     // Right before processing the last row, reset the previous offset to the new vgtid so the last row has the new vgtid as offset.
                     offsetContext.resetVgtid(newVgtid, message.getCommitTime());
                 }
-                if (isRecordOver1MB(message)) {
+                if (isRecordBig(message)) {
                     LOGGER.warn("Record is over 1MB, record: {}", message);
+                }
+                if (isMessageForByfile(message)) {
+                    LOGGER.warn("Record is for byfile, record: {}", message);
                 }
                 dispatcher.dispatchDataChangeEvent(
                         partition,
@@ -134,9 +137,13 @@ public class VitessStreamingChangeEventSource implements StreamingChangeEventSou
         };
     }
 
-    public boolean isRecordOver1MB(Object record) {
+    public boolean isRecordBig(Object record) {
         long size = ClassLayout.parseInstance(record).instanceSize();
-        return size > 1024 * 1024;
+        return size > 1000 * 100;
+    }
+
+    public boolean isMessageForByfile(ReplicationMessage message) {
+        return message.getTable().contains("files");
     }
 
 }
