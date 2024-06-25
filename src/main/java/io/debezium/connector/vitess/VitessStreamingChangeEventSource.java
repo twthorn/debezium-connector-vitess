@@ -124,6 +124,16 @@ public class VitessStreamingChangeEventSource implements StreamingChangeEventSou
                 }
                 if (isMessageForByfile(message) && getSizeBytes(message) > 100 * 1000) {
                     LOGGER.warn("Big message is for byfile, bytes: {}, message: {}", getSizeBytes(message), message);
+                    if (message.getOldTupleList() != null) {
+                        for (ReplicationMessage.Column column: message.getOldTupleList()) {
+                            LOGGER.warn("Column, name {}, bytes {}, value {}", column.getName(), getSizeBytes(column.getValue(true)), column.getValue(true));
+                        }
+                    }
+                    if (message.getNewTupleList() != null) {
+                        for (ReplicationMessage.Column column : message.getNewTupleList()) {
+                            LOGGER.warn("Column, name {}, bytes {}, value {}", column.getName(), getSizeBytes(column.getValue(true)), column.getValue(true));
+                        }
+                    }
                 }
                 dispatcher.dispatchDataChangeEvent(
                         partition,
