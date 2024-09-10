@@ -105,13 +105,19 @@ public class VitessEpochProvider {
         if (previousVgtidString == null) {
             throw new DebeziumException(String.format("Previous vgtid string cannot be null shard %s current %s", shard, vgtidString));
         }
-        Vgtid vgtid = Vgtid.of(vgtidString);
-        Vgtid previousVgtid = Vgtid.of(previousVgtidString);
-        this.shardEpochMap = getNewShardEpochMap(previousVgtid, vgtid);
-        if (isFirstTransaction) {
-            isFirstTransaction = false;
+        try {
+            Vgtid vgtid = Vgtid.of(vgtidString);
+            Vgtid previousVgtid = Vgtid.of(previousVgtidString);
+            this.shardEpochMap = getNewShardEpochMap(previousVgtid, vgtid);
+            if (isFirstTransaction) {
+                isFirstTransaction = false;
+            }
+            return shardEpochMap.get(shard);
         }
-        return shardEpochMap.get(shard);
+        catch (Exception e) {
+            LOGGER.error("Error providing epoch with shard {}, previousVgtid {}, vgtid {}", shard, previousVgtidString, vgtidString, e);
+            throw e;
+        }
     }
 
     private ShardEpochMap getNewShardEpochMap(Vgtid previousVgtid, Vgtid vgtid) {

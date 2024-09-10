@@ -28,6 +28,7 @@ import io.debezium.connector.vitess.TestHelper;
 import io.debezium.connector.vitess.Vgtid;
 import io.debezium.connector.vitess.VgtidTest;
 import io.debezium.connector.vitess.VitessConnectorConfig;
+import io.debezium.junit.logging.LogInterceptor;
 
 public class VitessEpochProviderTest {
 
@@ -216,6 +217,20 @@ public class VitessEpochProviderTest {
         assertThatThrownBy(() -> {
             provider.getEpoch(VgtidTest.TEST_SHARD, VGTID_JSON, VGTID_JSON);
         }).isInstanceOf(DebeziumException.class).hasMessageContaining("Previous epoch cannot be null");
+    }
+
+    @Test
+    public void previousCurrentNotFirstTransactionShouldThrowException() {
+        VitessEpochProvider provider = new VitessEpochProvider();
+        VitessConnectorConfig config = new VitessConnectorConfig(Configuration.empty());
+        provider.load(Map.of(VitessOrderedTransactionContext.OFFSET_TRANSACTION_EPOCH, TEST_SHARD_TO_EPOCH.toString()), config);
+        final LogInterceptor logInterceptor = new LogInterceptor(VitessEpochProvider.class);
+        provider.getEpoch(VgtidTest.TEST_SHARD, VGTID_BOTH_CURRENT, VGTID_JSON);
+        assertThatThrownBy(() -> {
+            provider.getEpoch(VgtidTest.TEST_SHARD, VGTID_BOTH_CURRENT, VGTID_JSON);
+        }).isInstanceOf(DebeziumException.class).hasMessageContaining("Invalid GTID");
+        String expectedLog = String.format("Error providing epoch with shard %s, previousVgtid %s, vgtid %s", VgtidTest.TEST_SHARD, VGTID_BOTH_CURRENT, VGTID_JSON);
+        assertThat(logInterceptor.containsErrorMessage(expectedLog)).isTrue();
     }
 
     @Test
