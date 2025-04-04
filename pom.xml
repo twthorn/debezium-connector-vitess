@@ -15,7 +15,7 @@
 
     <properties>
         <!-- Debezium parent -->
-        <version.debezium>${project.version}</version.debezium>
+        <version.debezium>3.1.0.Beta1</version.debezium>
 
         <!--
           Specify the properties that will be used for setting up the integration tests' Docker container.
