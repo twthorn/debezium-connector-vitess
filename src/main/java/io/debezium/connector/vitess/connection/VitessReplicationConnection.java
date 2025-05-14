@@ -356,6 +356,9 @@ public class VitessReplicationConnection implements ReplicationConnection {
                 .maxInboundMessageSize(config.getGrpcMaxInboundMessageSize())
                 .keepAliveTime(config.getKeepaliveInterval().toMillis(), TimeUnit.MILLISECONDS)
                 .build();
+        LOGGER.info("Channel configs - {}:{}, load balancer: {}, max inbound message size: {}, keep alive interval: {}",
+                config.getVtgateHost(), config.getVtgatePort(), config.getGrpcDefaultLoadBalancingPolicy(), config.getGrpcMaxInboundMessageSize(),
+                config.getKeepaliveInterval());
         return channel;
     }
 
