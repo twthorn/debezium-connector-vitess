@@ -109,6 +109,13 @@
                 <version>${version.grpc}</version>
             </dependency>
 
+            <!-- Temporary override until new Debezium main is released -->
+            <dependency>
+                <groupId>io.vitess</groupId>
+                <artifactId>vitess-grpc-client</artifactId>
+                <version>23.0.0-rc1</version>
+            </dependency>
+
             <!-- Building -->
             <dependency>
                 <groupId>io.debezium</groupId>
