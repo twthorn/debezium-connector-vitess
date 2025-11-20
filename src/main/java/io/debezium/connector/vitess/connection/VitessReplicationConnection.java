@@ -353,12 +353,41 @@ public class VitessReplicationConnection implements ReplicationConnection {
     }
 
     private ManagedChannel newChannel() {
-        ManagedChannel channel = ManagedChannelBuilder.forAddress(config.getVtgateHost(), config.getVtgatePort())
-                .defaultLoadBalancingPolicy(config.getGrpcDefaultLoadBalancingPolicy())
+        String lbPolicy = config.getGrpcDefaultLoadBalancingPolicy();
+
+        ManagedChannelBuilder<?> channelBuilder = ManagedChannelBuilder.forAddress(config.getVtgateHost(), config.getVtgatePort())
+                .defaultLoadBalancingPolicy(lbPolicy)
                 .usePlaintext()
                 .maxInboundMessageSize(config.getGrpcMaxInboundMessageSize())
-                .keepAliveTime(config.getKeepaliveInterval().toMillis(), TimeUnit.MILLISECONDS)
-                .build();
+                .keepAliveTime(config.getKeepaliveInterval().toMillis(), TimeUnit.MILLISECONDS);
+
+        // Apply load balancing policy configuration if provided
+        String policyConfigJson = config.getGrpcLoadBalancingConfig();
+        if (policyConfigJson != null) {
+            // Build full service config JSON and let gRPC's parser handle type conversions
+            String serviceConfigJson = String.format(
+                    "{\"loadBalancingConfig\": [{\"%s\": %s}]}",
+                    lbPolicy,
+                    policyConfigJson);
+
+            try {
+                // Use gRPC's JSON parser - handles Float vs Double correctly
+                @SuppressWarnings("unchecked")
+                Map<String, ?> serviceConfig = (Map<String, ?>) io.grpc.internal.JsonParser.parse(serviceConfigJson);
+                channelBuilder.defaultServiceConfig(serviceConfig)
+                        .disableServiceConfigLookUp(); // Use our config, don't look up from DNS
+
+                LOGGER.info("Configured load balancing policy '{}' with custom config", lbPolicy);
+            }
+            catch (Exception e) {
+                LOGGER.warn("Failed to apply load balancing config, using defaults: {}", e.getMessage());
+            }
+        }
+        else {
+            LOGGER.info("Using load balancing policy '{}' with default configuration", lbPolicy);
+        }
+
+        ManagedChannel channel = channelBuilder.build();
         return channel;
     }
 

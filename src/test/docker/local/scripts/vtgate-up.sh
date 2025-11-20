@@ -40,6 +40,7 @@ vtgate \
   --mysql_auth_server_impl none \
   --grpc_auth_mode static \
   --grpc_auth_static_password_file grpc_static_auth.json \
+  --grpc-enable-orca-metrics \
   > $VTDATAROOT/tmp/vtgate.out 2>&1 &
 
 # Block waiting for vtgate to be listening

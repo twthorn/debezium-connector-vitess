@@ -212,4 +212,60 @@ public class VitessConnectorConfigTest {
         assertThat(connectorConfig.getStreamKeyspaceHeartbeats()).isFalse();
     }
 
+    @Test
+    public void shouldConfigureLoadBalancingConfig() {
+        String lbConfig = "{\"enableOobLoadReport\":true,\"oobReportingPeriod\":\"30s\"}";
+        Configuration configuration = TestHelper.defaultConfig()
+                .with(VitessConnectorConfig.GRPC_LOAD_BALANCING_CONFIG, lbConfig)
+                .build();
+        VitessConnectorConfig connectorConfig = new VitessConnectorConfig(configuration);
+        assertThat(connectorConfig.getGrpcLoadBalancingConfig()).isEqualTo(lbConfig);
+    }
+
+    @Test
+    public void shouldDefaultLoadBalancingConfigToEmpty() {
+        Configuration configuration = TestHelper.defaultConfig().build();
+        VitessConnectorConfig connectorConfig = new VitessConnectorConfig(configuration);
+        assertThat(connectorConfig.getGrpcLoadBalancingConfig()).isEmpty();
+    }
+
+    @Test
+    public void shouldInvalidLoadBalancingConfigFailValidation() {
+        Configuration configuration = TestHelper.defaultConfig()
+                .with(VitessConnectorConfig.GRPC_LOAD_BALANCING_CONFIG, "{invalid json")
+                .build();
+        VitessConnectorConfig connectorConfig = new VitessConnectorConfig(configuration);
+        List<String> inputs = new ArrayList<>();
+        Consumer<String> printConsumer = (input) -> {
+            inputs.add(input);
+        };
+        connectorConfig.validateAndRecord(List.of(VitessConnectorConfig.GRPC_LOAD_BALANCING_CONFIG), printConsumer);
+        assertThat(inputs.size()).isEqualTo(1);
+    }
+
+    @Test
+    public void shouldValidLoadBalancingConfigPassValidation() {
+        String lbConfig = "{\"enableOobLoadReport\":true,\"oobReportingPeriod\":\"30s\"}";
+        Configuration configuration = TestHelper.defaultConfig()
+                .with(VitessConnectorConfig.GRPC_LOAD_BALANCING_CONFIG, lbConfig)
+                .build();
+        VitessConnectorConfig connectorConfig = new VitessConnectorConfig(configuration);
+        List<String> inputs = new ArrayList<>();
+        Consumer<String> printConsumer = (input) -> {
+            inputs.add(input);
+        };
+        connectorConfig.validateAndRecord(List.of(VitessConnectorConfig.GRPC_LOAD_BALANCING_CONFIG), printConsumer);
+        assertThat(inputs.size()).isEqualTo(0);
+    }
+
+    @Test
+    public void shouldReturnNullForEmptyLoadBalancingConfig() {
+        Configuration configuration = TestHelper.defaultConfig().build();
+        VitessConnectorConfig connectorConfig = new VitessConnectorConfig(configuration);
+
+        String lbConfig = connectorConfig.getGrpcLoadBalancingConfig();
+
+        assertThat(lbConfig).isNull();
+    }
+
 }

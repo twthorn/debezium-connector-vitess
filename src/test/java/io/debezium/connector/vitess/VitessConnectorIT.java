@@ -2197,6 +2197,72 @@ public class VitessConnectorIT extends AbstractVitessConnectorTest {
     }
 
     @Test
+    public void shouldConfigureWeightedRoundRobinWithOrcaConfig() throws Exception {
+        final LogInterceptor logInterceptor = new LogInterceptor(VitessReplicationConnection.class);
+
+        // Enable gRPC channel logging to capture ORCA report messages
+        java.util.logging.Logger grpcLogger = java.util.logging.Logger.getLogger("io.grpc.ChannelLogger");
+        java.util.logging.Level originalLevel = grpcLogger.getLevel();
+        grpcLogger.setLevel(java.util.logging.Level.FINEST); // ORCA logs at FINEST level
+
+        final AtomicBoolean orcaReportReceived = new AtomicBoolean(false);
+        java.util.logging.Handler handler = new java.util.logging.Handler() {
+            @Override
+            public void publish(java.util.logging.LogRecord record) {
+                String message = record.getMessage();
+                if (message != null && message.contains("Received an ORCA report")) {
+                    LOGGER.info("ORCA report received: {}", message);
+                    orcaReportReceived.set(true);
+                }
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        grpcLogger.addHandler(handler);
+
+        try {
+            // Configure connector with weighted_round_robin and ORCA enabled
+            String lbConfig = "{\"enableOobLoadReport\":true,\"oobReportingPeriod\":\"30s\"}";
+            Configuration config = TestHelper.defaultConfig()
+                    .with(VitessConnectorConfig.GRPC_DEFAULT_LOAD_BALANCING_POLICY, "weighted_round_robin")
+                    .with(VitessConnectorConfig.GRPC_LOAD_BALANCING_CONFIG, lbConfig)
+                    .build();
+
+            start(VitessConnector.class, config);
+            assertConnectorIsRunning();
+
+            // Verify the log message indicating custom load balancing config was applied
+            assertThat(logInterceptor.containsMessage("Configured load balancing policy 'weighted_round_robin' with custom config")).isTrue();
+
+            // Wait for ORCA report with timeout (server sends first report quickly, then every ~30s)
+            // Note: This test requires vtgate to be started with --grpc-enable-orca-metrics flag
+            long startTime = System.currentTimeMillis();
+            long timeout = 10_000; // 10 seconds to allow for initial report
+            while (!orcaReportReceived.get() && (System.currentTimeMillis() - startTime) < timeout) {
+                Thread.sleep(1_000);
+            }
+
+            // Verify ORCA report was received
+            if (!orcaReportReceived.get()) {
+                LOGGER.warn("ORCA report not received within {}ms. Ensure vtgate is started with --grpc-enable-orca-metrics flag.", timeout);
+            }
+            assertThat(orcaReportReceived.get())
+                    .as("ORCA report should be received when vtgate has --grpc-enable-orca-metrics flag")
+                    .isTrue();
+        }
+        finally {
+            grpcLogger.removeHandler(handler);
+            grpcLogger.setLevel(originalLevel);
+        }
+    }
+
+    @Test
     public void testInitialSnapshotModeHaveMultiShard() throws Exception {
         final boolean hasMultipleShards = true;
 

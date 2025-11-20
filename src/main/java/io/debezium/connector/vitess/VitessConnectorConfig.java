@@ -361,7 +361,22 @@ public class VitessConnectorConfig extends RelationalDatabaseConnectorConfig {
             .withDefault(GrpcUtil.DEFAULT_LB_POLICY)
             .withImportance(ConfigDef.Importance.MEDIUM)
             .withValidation(VitessConnectorConfig::validateLoadBalancingPolicy)
-            .withDescription("Specify the default load balancing policy used to connect to Vitess, e.g., 'pick_first', 'round_robin'");
+            .withDescription("Specify the default load balancing policy used to connect to Vitess, e.g., 'pick_first', 'round_robin', 'weighted_round_robin'");
+
+    public static final Field GRPC_LOAD_BALANCING_CONFIG = Field.create(VITESS_CONFIG_GROUP_PREFIX + "grpc.load.balancing.config")
+            .withDisplayName("VStream gRPC load balancing policy configuration")
+            .withType(Type.STRING)
+            .withWidth(Width.LONG)
+            .withDefault("")
+            .withImportance(ConfigDef.Importance.MEDIUM)
+            .withValidation(VitessConnectorConfig::validateLoadBalancingConfig)
+            .withDescription("JSON configuration for the load balancing policy. "
+                    + "For weighted_round_robin, you can configure: "
+                    + "{\"enableOobLoadReport\":true,\"oobReportingPeriod\":\"30s\",\"errorUtilizationPenalty\":1.0,\"blackoutPeriod\":\"10s\","
+                    + "\"weightExpirationPeriod\":\"180s\",\"weightUpdatePeriod\":\"1s\"}. "
+                    + "This allows full control over load balancing behavior without assumptions. "
+                    + "Leave empty to use policy defaults. "
+                    + "For periodic reconnection with load balancing, use vtgate's --grpc-max-connection-age flag on the server side.");
 
     public static final Field INCLUDE_UNKNOWN_DATATYPES = Field.create("include.unknown.datatypes")
             .withDisplayName("Include unknown datatypes")
@@ -512,6 +527,29 @@ public class VitessConnectorConfig extends RelationalDatabaseConnectorConfig {
         return 0;
     }
 
+    private static int validateLoadBalancingConfig(Configuration config, Field field, ValidationOutput problems) {
+        if (config.hasKey(GRPC_LOAD_BALANCING_CONFIG)) {
+            final String configJson = config.getString(GRPC_LOAD_BALANCING_CONFIG.name());
+            final String lbPolicy = config.getString(GRPC_DEFAULT_LOAD_BALANCING_POLICY.name(), GrpcUtil.DEFAULT_LB_POLICY);
+            if (configJson != null && !configJson.trim().isEmpty()) {
+                try {
+                    // Use gRPC's JSON parser to validate - it will catch type mismatches
+                    String serviceConfigJson = String.format(
+                            "{\"loadBalancingConfig\": [{\"%s\": %s}]}",
+                            lbPolicy,
+                            configJson);
+                    io.grpc.internal.JsonParser.parse(serviceConfigJson);
+                }
+                catch (Exception e) {
+                    problems.accept(GRPC_LOAD_BALANCING_CONFIG, configJson,
+                            "Invalid load balancing config: " + e.getMessage());
+                    return 1;
+                }
+            }
+        }
+        return 0;
+    }
+
     public static final Field SOURCE_INFO_STRUCT_MAKER = CommonConnectorConfig.SOURCE_INFO_STRUCT_MAKER
             .withDefault(VitessSourceInfoStructMaker.class.getName());
 
@@ -532,6 +570,8 @@ public class VitessConnectorConfig extends RelationalDatabaseConnectorConfig {
                     KEEPALIVE_INTERVAL_MS,
                     GRPC_HEADERS,
                     GRPC_MAX_INBOUND_MESSAGE_SIZE,
+                    GRPC_DEFAULT_LOAD_BALANCING_POLICY,
+                    GRPC_LOAD_BALANCING_CONFIG,
                     BINARY_HANDLING_MODE,
                     SCHEMA_NAME_ADJUSTMENT_MODE,
                     OFFSET_STORAGE_PER_TASK,
@@ -771,6 +811,18 @@ public class VitessConnectorConfig extends RelationalDatabaseConnectorConfig {
 
     public String getGrpcDefaultLoadBalancingPolicy() {
         return getConfig().getString(GRPC_DEFAULT_LOAD_BALANCING_POLICY);
+    }
+
+    /**
+     * Get the load balancing config as a raw JSON string.
+     * Returns null if not configured.
+     */
+    public String getGrpcLoadBalancingConfig() {
+        String config = getConfig().getString(GRPC_LOAD_BALANCING_CONFIG);
+        if (config == null || config.trim().isEmpty()) {
+            return null;
+        }
+        return config;
     }
 
     public boolean includeUnknownDatatypes() {
