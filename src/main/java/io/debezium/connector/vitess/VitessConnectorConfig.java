@@ -457,8 +457,7 @@ public class VitessConnectorConfig extends RelationalDatabaseConnectorConfig {
             .withValidation(Field::isNonNegativeInteger)
             .withDescription("Maximum duration (in seconds) a VStream runs before the server terminates it with UNAVAILABLE. "
                     + "The client reconnects automatically. A jitter of +/-10% is added server-side to spread out reconnections. "
-                    + "0 means no maximum age (disabled). "
-                    + "This enables periodic rebalancing for ORCA-aware gRPC load balancing.");
+                    + "0 means no maximum age (disabled).");
 
     public static final Field INCLUDE_UNKNOWN_DATATYPES = Field.create("include.unknown.datatypes")
             .withDisplayName("Include unknown datatypes")

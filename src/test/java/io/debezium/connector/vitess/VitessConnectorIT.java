@@ -2803,7 +2803,7 @@ public class VitessConnectorIT extends AbstractVitessConnectorTest {
     }
 
     @Test
-    public void shouldRestartStreamWhenMaxStreamAgeExceeded() throws Exception {
+    public void shouldResumeWithoutGapOrDuplicateWhenMaxStreamAgeExceeded() throws Exception {
         TestHelper.executeDDL("vitess_create_tables.ddl");
         final LogInterceptor replicationLogInterceptor = new LogInterceptor(VitessReplicationConnection.class);
 
@@ -2813,19 +2813,23 @@ public class VitessConnectorIT extends AbstractVitessConnectorTest {
                 false);
         assertConnectorIsRunning();
 
-        int expectedRecordsCount = 1;
-        consumer = testConsumer(expectedRecordsCount);
-        consumer.expects(expectedRecordsCount);
-        assertInsert(INSERT_NUMERIC_TYPES_STMT, schemasAndValuesForNumericTypes(), TestHelper.PK_FIELD);
+        String topic = TEST_UNSHARDED_KEYSPACE + ".numeric_table";
+        consumer = testConsumer(1);
+        executeAndWait(INSERT_NUMERIC_TYPES_STMT);
+        assertRecordInserted(topic, TestHelper.PK_FIELD, 1L);
 
-        int waitSeconds = maxStreamAgeSeconds * 2 + 10;
+        // vtgate adds +/-10% jitter to the max age
+        Duration restartTimeout = Duration.ofSeconds((long) (maxStreamAgeSeconds * 1.1) + 30);
         Awaitility.await()
-                .atMost(Duration.ofSeconds(waitSeconds))
+                .atMost(restartTimeout)
                 .pollInterval(Duration.ofSeconds(1))
-                .until(() -> replicationLogInterceptor.containsMessage(
-                        "VStream terminated, restarting stream on existing gRPC channel"));
-
+                .until(() -> replicationLogInterceptor.containsMessage("VStream exceeded max stream age, restarting stream"));
         assertConnectorIsRunning();
+
+        consumer.expects(1);
+        executeAndWait(INSERT_NUMERIC_TYPES_STMT);
+        assertRecordInserted(topic, TestHelper.PK_FIELD, 2L);
+        assertThat(consumer.countRecords(5, TimeUnit.SECONDS)).isZero();
     }
 
     private void waitForGtidAcquiring(final LogInterceptor logInterceptor) {

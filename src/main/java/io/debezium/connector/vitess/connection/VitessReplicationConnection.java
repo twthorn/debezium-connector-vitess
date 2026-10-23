@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
@@ -57,7 +58,7 @@ public class VitessReplicationConnection implements ReplicationConnection {
     private final VitessConnectorConfig config;
     // Channel closing is invoked from the change-event-source-coordinator thread
     private final AtomicReference<ManagedChannel> managedChannel = new AtomicReference<>();
-    private final AtomicReference<Boolean> streamRestartNeeded = new AtomicReference<>(false);
+    private final AtomicBoolean streamRestartNeeded = new AtomicBoolean(false);
 
     public VitessReplicationConnection(VitessConnectorConfig config, VitessDatabaseSchema schema) {
         this.messageDecoder = new VStreamOutputMessageDecoder(schema);
@@ -118,14 +119,7 @@ public class VitessReplicationConnection implements ReplicationConnection {
                                Vgtid vgtid, ReplicationMessageProcessor processor, AtomicReference<Throwable> error) {
         Objects.requireNonNull(vgtid);
 
-        ManagedChannel channel = managedChannel.get();
-        if (channel == null || channel.isShutdown() || channel.isTerminated()) {
-            LOGGER.info("Creating new gRPC channel for VStream");
-            channel = replaceManagedChannel();
-        }
-        else {
-            LOGGER.debug("Reusing existing gRPC channel for VStream");
-        }
+        ManagedChannel channel = replaceManagedChannel();
 
         VitessGrpc.VitessStub stub = newStub(channel);
 
@@ -283,7 +277,7 @@ public class VitessReplicationConnection implements ReplicationConnection {
             public void onError(Throwable t) {
                 Status status = Status.fromThrowable(t);
                 if (shouldRestartStream(status)) {
-                    LOGGER.info("VStream terminated, restarting stream on existing gRPC channel (preserves ORCA metrics): {}", status);
+                    LOGGER.info("VStream exceeded max stream age, restarting stream: {}", status);
                     streamRestartNeeded.set(true);
                 }
                 else {
@@ -400,9 +394,9 @@ public class VitessReplicationConnection implements ReplicationConnection {
     }
 
     /**
-     * Determines if the stream should be restarted (reopened) on the existing gRPC channel
-     * rather than propagating the error. This allows the channel to be preserved, which
-     * maintains ORCA metrics for weighted load balancing.
+     * Determines if the stream should be restarted rather than propagating the error. vtgate
+     * signals max stream age only via UNAVAILABLE plus this message text (there is no dedicated
+     * error code or detail), so matching on the description is the only option.
      */
     private static boolean shouldRestartStream(Status status) {
         if (status.getCode() == Status.Code.UNAVAILABLE
